@@ -116,3 +116,53 @@ export interface NotaCliente {
   created_by: string | null;
   created_at: string;
 }
+
+export type GastoCategoria =
+  | "infraestructura"
+  | "software"
+  | "marketing"
+  | "legal_contable"
+  | "equipos"
+  | "otros";
+
+export const GASTO_CATEGORIAS: GastoCategoria[] = [
+  "infraestructura",
+  "software",
+  "marketing",
+  "legal_contable",
+  "equipos",
+  "otros",
+];
+
+export const GASTO_CATEGORIA_LABELS: Record<GastoCategoria, string> = {
+  infraestructura: "Infraestructura",
+  software: "Software",
+  marketing: "Marketing",
+  legal_contable: "Legal y contable",
+  equipos: "Equipos",
+  otros: "Otros",
+};
+
+export type GastoFrecuencia = "unico" | "mensual" | "anual";
+
+export const GASTO_FRECUENCIA_LABELS: Record<GastoFrecuencia, string> = {
+  unico: "Único",
+  mensual: "Mensual",
+  anual: "Anual",
+};
+
+export interface Gasto {
+  id: string;
+  fecha: string;
+  concepto: string;
+  proveedor: string | null;
+  categoria: GastoCategoria;
+  frecuencia: GastoFrecuencia;
+  monto: number;
+  medio_pago: MedioPago | null;
+  url_adjunto: string | null;
+  notas: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
