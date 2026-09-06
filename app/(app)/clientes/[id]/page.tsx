@@ -3,7 +3,13 @@ import Topbar from "@/components/Topbar";
 import SubmitButton from "@/components/SubmitButton";
 import { createClient } from "@/lib/supabase/server";
 import { formatSoles, formatFecha } from "@/lib/format";
-import { CLIENTE_ESTADOS, CLIENTE_ESTADO_LABELS, type Cliente, type NotaCliente } from "@/lib/types";
+import {
+  CLIENTE_ESTADOS,
+  CLIENTE_ESTADO_LABELS,
+  estadoComprobanteDisplay,
+  type Cliente,
+  type NotaCliente,
+} from "@/lib/types";
 import { updateCliente, addNotaCliente } from "../actions";
 
 const inputClass =
@@ -181,9 +187,7 @@ export default async function ClienteFichaPage({
           <div className="rounded-[14px] border border-nexa-border bg-white p-6">
             <h2 className="mb-4 text-sm font-bold text-nexa-navy">Comprobantes</h2>
             {(!comprobantes || comprobantes.length === 0) ? (
-              <p className="text-sm text-nexa-topbar-muted">
-                Todavía no hay comprobantes registrados — esto se habilita en la Fase 2.
-              </p>
+              <p className="text-sm text-nexa-topbar-muted">Todavía no hay comprobantes registrados.</p>
             ) : (
               <table className="w-full text-left text-sm">
                 <thead>
@@ -193,6 +197,7 @@ export default async function ClienteFichaPage({
                     <th className="py-2">Serie-número</th>
                     <th className="py-2 text-right">Total</th>
                     <th className="py-2">Estado</th>
+                    <th className="py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -202,7 +207,19 @@ export default async function ClienteFichaPage({
                       <td className="py-2">{comp.tipo}</td>
                       <td className="py-2">{comp.serie_numero ?? "—"}</td>
                       <td className="num py-2 text-right">{formatSoles(comp.total)}</td>
-                      <td className="py-2">{comp.estado_pago}</td>
+                      <td className="py-2 capitalize">{estadoComprobanteDisplay(comp)}</td>
+                      <td className="py-2">
+                        {comp.url_adjunto && (
+                          <a
+                            href={`/api/adjuntos/${encodeURIComponent(comp.url_adjunto)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[12px] font-semibold text-nexa-blue hover:underline"
+                          >
+                            Adjunto
+                          </a>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
