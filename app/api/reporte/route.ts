@@ -21,7 +21,7 @@ export async function GET() {
     core_clientes: { nombre: string; nombre_comercial: string | null } | null;
   };
   const comprobantes = (comprobantesRaw ?? []) as ComprobanteConCliente[];
-  const gastos = (gastosRaw ?? []) as Gasto[];
+  const gastos = ((gastosRaw ?? []) as Gasto[]).filter((g) => !g.anulado);
 
   const totalesPorCliente = new Map<string, { facturado: number; cobrado: number }>();
   for (const c of comprobantes) {
@@ -76,21 +76,27 @@ export async function GET() {
     Categoría: g.categoria,
     Frecuencia: g.frecuencia,
     Monto: g.monto,
+    "IGV crédito fiscal": g.credito_fiscal ? g.igv : 0,
     "Medio de pago": g.medio_pago ?? "",
   }));
 
-  const resumenPorMes = new Map<string, { ingresos: number; gastos: number }>();
+  const resumenPorMes = new Map<
+    string,
+    { ingresos: number; gastos: number; igvVentas: number; igvCompras: number }
+  >();
   for (const c of comprobantes) {
     if (c.estado_pago === "anulado") continue;
     const key = c.fecha_emision.slice(0, 7);
-    const acc = resumenPorMes.get(key) ?? { ingresos: 0, gastos: 0 };
+    const acc = resumenPorMes.get(key) ?? { ingresos: 0, gastos: 0, igvVentas: 0, igvCompras: 0 };
     acc.ingresos += c.total;
+    acc.igvVentas += c.igv;
     resumenPorMes.set(key, acc);
   }
   for (const g of gastos) {
     const key = g.fecha.slice(0, 7);
-    const acc = resumenPorMes.get(key) ?? { ingresos: 0, gastos: 0 };
+    const acc = resumenPorMes.get(key) ?? { ingresos: 0, gastos: 0, igvVentas: 0, igvCompras: 0 };
     acc.gastos += g.monto;
+    if (g.credito_fiscal) acc.igvCompras += g.igv;
     resumenPorMes.set(key, acc);
   }
   const hojaResumen = [...resumenPorMes.entries()]
@@ -100,6 +106,7 @@ export async function GET() {
       Ingresos: v.ingresos,
       Gastos: v.gastos,
       Utilidad: v.ingresos - v.gastos,
+      "IGV a pagar (estimado)": v.igvVentas - v.igvCompras,
     }));
 
   const workbook = XLSX.utils.book_new();

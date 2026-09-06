@@ -1,8 +1,10 @@
 import Topbar from "@/components/Topbar";
 import RegistrarMovimientoModal from "@/components/RegistrarMovimientoModal";
+import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
 import { createClient } from "@/lib/supabase/server";
 import { formatSoles, formatFecha } from "@/lib/format";
 import { GASTO_CATEGORIA_LABELS, type Gasto, type GastoCategoria } from "@/lib/types";
+import { anularGasto } from "./actions";
 
 export default async function GastosPage({
   searchParams,
@@ -17,16 +19,20 @@ export default async function GastosPage({
     supabase.from("core_clientes").select("id, nombre, nombre_comercial").order("nombre"),
   ]);
 
-  let lista = (gastosRaw ?? []) as Gasto[];
+  const todos = (gastosRaw ?? []) as Gasto[];
+  const vigentes = todos.filter((g) => !g.anulado);
+
+  let lista = todos;
   if (categoria) lista = lista.filter((g) => g.categoria === categoria);
 
   const porCategoria = new Map<GastoCategoria, number>();
-  for (const g of gastosRaw ?? []) {
+  for (const g of vigentes) {
     porCategoria.set(g.categoria, (porCategoria.get(g.categoria) ?? 0) + g.monto);
   }
   const totalGastos = [...porCategoria.values()].reduce((s, v) => s + v, 0);
+  const igvCreditoFiscal = vigentes.reduce((s, g) => s + (g.credito_fiscal ? g.igv : 0), 0);
 
-  const puntoEquilibrio = (gastosRaw ?? []).reduce((s, g) => {
+  const puntoEquilibrio = vigentes.reduce((s, g) => {
     if (g.frecuencia === "mensual") return s + g.monto;
     if (g.frecuencia === "anual") return s + g.monto / 12;
     return s;
@@ -74,6 +80,10 @@ export default async function GastosPage({
                 <p className="text-sm text-nexa-topbar-muted">Sin gastos registrados todavía.</p>
               )}
             </div>
+            <div className="mt-4 flex items-center justify-between border-t border-nexa-border pt-3 text-[12.5px] font-semibold text-nexa-topbar-muted">
+              <span>IGV con crédito fiscal disponible</span>
+              <span className="num text-nexa-navy">{formatSoles(igvCreditoFiscal)}</span>
+            </div>
           </div>
 
           <div className="rounded-[14px] border border-nexa-border bg-nexa-navy p-5 text-white">
@@ -97,38 +107,64 @@ export default async function GastosPage({
                 <th className="px-5 py-3">Categoría</th>
                 <th className="px-5 py-3">Frecuencia</th>
                 <th className="px-5 py-3 text-right">Monto</th>
-                <th className="px-5 py-3"></th>
+                <th className="px-5 py-3 text-right">IGV c.f.</th>
+                <th className="px-5 py-3">Acción</th>
               </tr>
             </thead>
             <tbody>
               {lista.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-nexa-topbar-muted">
+                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-nexa-topbar-muted">
                     No hay gastos que coincidan con el filtro.
                   </td>
                 </tr>
               )}
               {lista.map((g) => (
-                <tr key={g.id} className="border-b border-nexa-border last:border-0 hover:bg-nexa-app-bg">
+                <tr
+                  key={g.id}
+                  className={`border-b border-nexa-border last:border-0 hover:bg-nexa-app-bg ${g.anulado ? "opacity-50" : ""}`}
+                >
                   <td className="px-5 py-3 text-nexa-topbar-text">{formatFecha(g.fecha)}</td>
-                  <td className="px-5 py-3 font-medium text-nexa-navy">{g.concepto}</td>
+                  <td className="px-5 py-3 font-medium text-nexa-navy">
+                    {g.concepto}
+                    {g.anulado && (
+                      <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                        Anulado
+                      </span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-nexa-topbar-text">{g.proveedor ?? "—"}</td>
                   <td className="px-5 py-3 text-nexa-topbar-text">{GASTO_CATEGORIA_LABELS[g.categoria]}</td>
                   <td className="px-5 py-3 text-nexa-topbar-text capitalize">{g.frecuencia}</td>
                   <td className="num px-5 py-3 text-right font-semibold text-nexa-topbar-text">
                     {formatSoles(g.monto)}
                   </td>
+                  <td className="num px-5 py-3 text-right text-nexa-topbar-text">
+                    {g.credito_fiscal ? formatSoles(g.igv) : "—"}
+                  </td>
                   <td className="px-5 py-3">
-                    {g.url_adjunto && (
-                      <a
-                        href={`/api/adjuntos/${encodeURIComponent(g.url_adjunto)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-md px-2 py-1 text-[12px] font-semibold text-nexa-blue hover:bg-nexa-light"
-                      >
-                        Adjunto
-                      </a>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {!g.anulado && (
+                        <form action={anularGasto.bind(null, g.id)}>
+                          <ConfirmSubmitButton
+                            confirmMessage="¿Anular este gasto? Queda marcado como anulado, no se borra."
+                            className="rounded-md px-2 py-1 text-[12px] font-semibold text-nexa-alert hover:bg-nexa-alert/10"
+                          >
+                            Anular
+                          </ConfirmSubmitButton>
+                        </form>
+                      )}
+                      {g.url_adjunto && (
+                        <a
+                          href={`/api/adjuntos/${encodeURIComponent(g.url_adjunto)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-md px-2 py-1 text-[12px] font-semibold text-nexa-blue hover:bg-nexa-light"
+                        >
+                          Adjunto
+                        </a>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

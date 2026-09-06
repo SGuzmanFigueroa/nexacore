@@ -1,5 +1,5 @@
+import Link from "next/link";
 import Topbar from "@/components/Topbar";
-import ProximamenteCard from "@/components/ProximamenteCard";
 
 export default function ReportesPage() {
   return (
@@ -18,10 +18,17 @@ export default function ReportesPage() {
             Descargar Excel
           </a>
         </div>
-        <ProximamenteCard
-          fase="la Fase 4 (siguiente entrega)"
-          detalle="Adjuntos en Storage, cronograma de vencimientos SUNAT y cálculo estimado de IGV/Renta (régimen MYPE Tributario) — pendiente tu OK sobre el cambio de esquema en core_gastos."
-        />
+        <div className="mt-6 rounded-[14px] border border-nexa-border bg-white p-6 text-center text-[13px] text-nexa-topbar-muted">
+          El cronograma de vencimientos SUNAT y el estimado de IGV/Renta del mes están en{" "}
+          <Link href="/panel" className="font-semibold text-nexa-blue hover:underline">
+            Panel
+          </Link>
+          . El régimen tributario se cambia en{" "}
+          <Link href="/configuracion" className="font-semibold text-nexa-blue hover:underline">
+            Configuración
+          </Link>
+          .
+        </div>
       </div>
     </>
   );

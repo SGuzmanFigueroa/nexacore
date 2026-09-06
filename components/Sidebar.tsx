@@ -11,6 +11,7 @@ import {
   GastosIcon,
   CobranzasIcon,
   ReportesIcon,
+  ConfiguracionIcon,
 } from "./icons";
 
 export default function Sidebar({
@@ -115,6 +116,9 @@ export default function Sidebar({
           </p>
           <NavLink href="/reportes" icon={<ReportesIcon />} onNavigate={close}>
             Reportes
+          </NavLink>
+          <NavLink href="/configuracion" icon={<ConfiguracionIcon />} onNavigate={close}>
+            Configuración
           </NavLink>
         </nav>
 

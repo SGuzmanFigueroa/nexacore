@@ -32,12 +32,19 @@ export default function RegistrarMovimientoModal({
   const [tipoMovimiento, setTipoMovimiento] = useState<"ingreso" | "gasto">("ingreso");
   const [subtotal, setSubtotal] = useState(0);
   const [afectoIgv, setAfectoIgv] = useState(true);
+  const [montoGasto, setMontoGasto] = useState(0);
+  const [creditoFiscal, setCreditoFiscal] = useState(false);
 
   const igv = useMemo(() => (afectoIgv ? Math.round(subtotal * 0.18 * 100) / 100 : 0), [
     subtotal,
     afectoIgv,
   ]);
   const total = Math.round((subtotal + igv) * 100) / 100;
+
+  const igvGasto = useMemo(
+    () => (creditoFiscal ? Math.round(((montoGasto * 0.18) / 1.18) * 100) / 100 : 0),
+    [montoGasto, creditoFiscal],
+  );
 
   return (
     <>
@@ -179,8 +186,16 @@ export default function RegistrarMovimientoModal({
                     <input name="fecha" type="date" defaultValue={HOY} required className={`${inputClass} mt-1`} />
                   </div>
                   <div>
-                    <label className={labelClass}>Monto (S/)</label>
-                    <input name="monto" type="number" step="0.01" min="0" required className={`${inputClass} mt-1`} />
+                    <label className={labelClass}>Monto total (S/)</label>
+                    <input
+                      name="monto"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      className={`${inputClass} mt-1`}
+                      onChange={(e) => setMontoGasto(Number(e.target.value) || 0)}
+                    />
                   </div>
                   <input name="concepto" required placeholder="Concepto" className={`${inputClass} col-span-2`} />
                   <input name="proveedor" placeholder="Proveedor" className={`${inputClass} col-span-2`} />
@@ -206,9 +221,29 @@ export default function RegistrarMovimientoModal({
                       </option>
                     ))}
                   </select>
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      id="credito_fiscal"
+                      name="credito_fiscal"
+                      type="checkbox"
+                      onChange={(e) => setCreditoFiscal(e.target.checked)}
+                    />
+                    <label htmlFor="credito_fiscal" className="text-sm text-nexa-topbar-text">
+                      Con factura (IGV con crédito fiscal)
+                    </label>
+                  </div>
                   <AdjuntoInput />
                   <textarea name="notas" placeholder="Notas" rows={2} className={`${inputClass} col-span-2`} />
                 </div>
+
+                {creditoFiscal && (
+                  <div className="flex items-center justify-between rounded-[9px] bg-nexa-app-bg px-4 py-3">
+                    <span className="text-[12px] font-semibold text-nexa-topbar-muted">
+                      IGV incluido en el monto (crédito fiscal)
+                    </span>
+                    <span className="num text-base font-bold text-nexa-navy">S/ {igvGasto.toFixed(2)}</span>
+                  </div>
+                )}
 
                 <div className="flex justify-end gap-2 pt-1">
                   <button

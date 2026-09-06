@@ -159,10 +159,28 @@ export interface Gasto {
   categoria: GastoCategoria;
   frecuencia: GastoFrecuencia;
   monto: number;
+  igv: number;
+  credito_fiscal: boolean;
+  anulado: boolean;
   medio_pago: MedioPago | null;
   url_adjunto: string | null;
   notas: string | null;
   created_by: string | null;
   created_at: string;
+  updated_at: string;
+}
+
+export type RegimenRenta = "mype_tributario" | "general";
+
+export const REGIMEN_RENTA_LABELS: Record<RegimenRenta, string> = {
+  mype_tributario: "MYPE Tributario",
+  general: "Régimen General",
+};
+
+export interface Configuracion {
+  id: true;
+  ruc: string;
+  razon_social: string;
+  regimen_renta: RegimenRenta;
   updated_at: string;
 }

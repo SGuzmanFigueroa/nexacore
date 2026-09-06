@@ -4,7 +4,14 @@ import RegistrarMovimientoModal from "@/components/RegistrarMovimientoModal";
 import BarrasIngresosGastos from "@/components/BarrasIngresosGastos";
 import { createClient } from "@/lib/supabase/server";
 import { formatSoles, formatFecha } from "@/lib/format";
-import { estadoComprobanteDisplay, type Comprobante, type Gasto } from "@/lib/types";
+import {
+  estadoComprobanteDisplay,
+  REGIMEN_RENTA_LABELS,
+  type Comprobante,
+  type Configuracion,
+  type Gasto,
+} from "@/lib/types";
+import { calcularEstimadoMensual, nombrePeriodo, proximoVencimiento } from "@/lib/sunat";
 
 const MESES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -28,6 +35,7 @@ export default async function PanelPage() {
     { data: comprobantesRaw },
     { data: gastosRaw },
     { data: clientes },
+    { data: configRaw },
   ] = await Promise.all([
     supabase
       .from("core_comprobantes")
@@ -36,13 +44,15 @@ export default async function PanelPage() {
       .order("fecha_emision", { ascending: false }),
     supabase.from("core_gastos").select("*").gte("fecha", inicioVentana).order("fecha", { ascending: false }),
     supabase.from("core_clientes").select("id, nombre, nombre_comercial").order("nombre"),
+    supabase.from("core_configuracion").select("*").eq("id", true).single(),
   ]);
 
   type ComprobanteConCliente = Comprobante & {
     core_clientes: { nombre: string; nombre_comercial: string | null } | null;
   };
   const comprobantes = (comprobantesRaw ?? []) as ComprobanteConCliente[];
-  const gastos = (gastosRaw ?? []) as Gasto[];
+  const gastos = ((gastosRaw ?? []) as Gasto[]).filter((g) => !g.anulado);
+  const config = configRaw as Configuracion;
 
   const ingresosMes = comprobantes
     .filter((c) => monthKey(c.fecha_emision) === mesActual && c.estado_pago !== "anulado")
@@ -66,6 +76,23 @@ export default async function PanelPage() {
       gastos: gastos.filter((g) => monthKey(g.fecha) === key).reduce((s, g) => s + g.monto, 0),
     };
   });
+
+  // Estimado SUNAT del mes en curso: IGV de ventas del mes menos IGV de
+  // compras con credito fiscal del mes, y pago a cuenta de Renta segun el
+  // regimen configurado. Es informativo, nunca se envia a SUNAT.
+  const igvVentasMes = comprobantes
+    .filter((c) => monthKey(c.fecha_emision) === mesActual && c.estado_pago !== "anulado")
+    .reduce((s, c) => s + c.igv, 0);
+  const igvComprasMes = gastos
+    .filter((g) => monthKey(g.fecha) === mesActual && g.credito_fiscal)
+    .reduce((s, g) => s + g.igv, 0);
+  const estimado = calcularEstimadoMensual({
+    ingresosNetos: ingresosMes,
+    igvVentas: igvVentasMes,
+    igvComprasCreditoFiscal: igvComprasMes,
+    regimen: config.regimen_renta,
+  });
+  const vencimiento = proximoVencimiento(hoy, config.ruc);
 
   const cobranzasPendientes = comprobantes
     .filter((c) => c.estado_pago === "pendiente")
@@ -97,7 +124,7 @@ export default async function PanelPage() {
     <>
       <Topbar
         title="Panel general"
-        subtitle="NEXA CONSULTING TI S.A.C. — RUC 20616354664"
+        subtitle={`${config.razon_social} — RUC ${config.ruc}`}
         actions={<RegistrarMovimientoModal clientes={clientes ?? []} />}
       />
 
@@ -121,6 +148,49 @@ export default async function PanelPage() {
             <p className="text-[11px] font-bold uppercase tracking-wide text-nexa-sidebar-text-muted">Por cobrar</p>
             <p className="num mt-1 text-xl font-bold">{formatSoles(porCobrar)}</p>
           </div>
+        </div>
+
+        <div className="rounded-[14px] border border-nexa-border bg-white p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-nexa-topbar-muted">
+              SUNAT — estimado del mes ({REGIMEN_RENTA_LABELS[config.regimen_renta]})
+            </p>
+            {vencimiento ? (
+              <span
+                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                  vencimiento.vencido ? "bg-nexa-alert/10 text-nexa-alert" : "bg-nexa-light text-nexa-blue"
+                }`}
+              >
+                {nombrePeriodo(vencimiento.periodo)} vence {formatFecha(vencimiento.fecha)}
+              </span>
+            ) : (
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">
+                Cronograma no cargado para este período
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">IGV a pagar (estimado)</p>
+              <p className={`num mt-1 text-lg font-bold ${estimado.igvAPagar >= 0 ? "text-nexa-navy" : "text-nexa-positive"}`}>
+                {estimado.igvAPagar >= 0 ? formatSoles(estimado.igvAPagar) : `${formatSoles(Math.abs(estimado.igvAPagar))} a favor`}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">
+                Pago a cuenta Renta ({(estimado.tasaRenta * 100).toFixed(1)}%)
+              </p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimado.pagoACuentaRenta)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">Total estimado a pagar</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-alert">{formatSoles(estimado.totalEstimado)}</p>
+            </div>
+          </div>
+          <p className="mt-4 text-[11.5px] text-nexa-topbar-muted">
+            Estimado informativo a partir de lo registrado en Nexa Core — no reemplaza tu declaración en SUNAT ni el
+            cálculo de tu contador.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
