@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f7fa;
+  --foreground: #0a1f44;
+
+  /* Paleta de marca Nexa Core (calcada del mockup aprobado) */
+  --nexa-navy: #0a1f44;
+  --nexa-navy-active: #123064;
+  --nexa-navy-soft: #0f274f;
+  --nexa-blue: #0b6cff;
+  --nexa-sky: #29b6f6;
+  --nexa-light: #e3f2fd;
+  --nexa-app-bg: #f5f7fa;
+  --nexa-border: #e9edf5;
+  --nexa-border-topbar: #e4e9f2;
+  --nexa-positive: #0f9d58;
+  --nexa-alert: #b45309;
+  --nexa-badge: #ffb020;
+
+  /* Texto sobre el sidebar navy */
+  --nexa-sidebar-text: #b8c7de;
+  --nexa-sidebar-text-muted: #7c93bc;
+  --nexa-sidebar-heading: #5c74a0;
+  --nexa-sidebar-icon: #8aa0c2;
+  --nexa-topbar-muted: #7a88a0;
+  --nexa-topbar-text: #33415c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-nexa-navy: var(--nexa-navy);
+  --color-nexa-navy-active: var(--nexa-navy-active);
+  --color-nexa-navy-soft: var(--nexa-navy-soft);
+  --color-nexa-blue: var(--nexa-blue);
+  --color-nexa-sky: var(--nexa-sky);
+  --color-nexa-light: var(--nexa-light);
+  --color-nexa-app-bg: var(--nexa-app-bg);
+  --color-nexa-border: var(--nexa-border);
+  --color-nexa-border-topbar: var(--nexa-border-topbar);
+  --color-nexa-positive: var(--nexa-positive);
+  --color-nexa-alert: var(--nexa-alert);
+  --color-nexa-badge: var(--nexa-badge);
+  --color-nexa-sidebar-text: var(--nexa-sidebar-text);
+  --color-nexa-sidebar-text-muted: var(--nexa-sidebar-text-muted);
+  --color-nexa-sidebar-heading: var(--nexa-sidebar-heading);
+  --color-nexa-sidebar-icon: var(--nexa-sidebar-icon);
+  --color-nexa-topbar-muted: var(--nexa-topbar-muted);
+  --color-nexa-topbar-text: var(--nexa-topbar-text);
+  --font-sans: var(--font-manrope);
+}
+
+body {
+  background: var(--nexa-app-bg);
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
