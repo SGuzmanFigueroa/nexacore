@@ -95,6 +95,11 @@ export interface Comprobante {
   fecha_cobro: string | null;
   url_adjunto: string | null;
   notas: string | null;
+  nubefact_pdf_url: string | null;
+  nubefact_xml_url: string | null;
+  nubefact_cdr_url: string | null;
+  nubefact_aceptado: boolean | null;
+  nubefact_mensaje: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

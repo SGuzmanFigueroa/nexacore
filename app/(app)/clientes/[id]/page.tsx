@@ -214,9 +214,19 @@ export default async function ClienteFichaPage({
                             href={`/api/adjuntos/${encodeURIComponent(comp.url_adjunto)}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[12px] font-semibold text-nexa-blue hover:underline"
+                            className="mr-2 text-[12px] font-semibold text-nexa-blue hover:underline"
                           >
                             Adjunto
+                          </a>
+                        )}
+                        {comp.nubefact_pdf_url && (
+                          <a
+                            href={comp.nubefact_pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[12px] font-semibold text-nexa-positive hover:underline"
+                          >
+                            PDF SUNAT
                           </a>
                         )}
                       </td>

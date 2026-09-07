@@ -17,6 +17,11 @@ function num(formData: FormData, key: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+// La emision electronica real (Nubefact) queda en lib/nubefact.ts, lista
+// para conectar aqui cuando se pase a un plan de produccion — mientras el
+// token sea de pruebas no tiene sentido emitir con el, asi que este
+// registro sigue siendo manual (serie_numero tal como se emitio en otro
+// lado), igual que en la Fase 2 original.
 export async function createComprobante(formData: FormData) {
   const supabase = await createClient();
   const {

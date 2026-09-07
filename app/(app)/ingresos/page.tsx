@@ -177,6 +177,16 @@ export default async function IngresosPage({
                             Adjunto
                           </a>
                         )}
+                        {c.nubefact_pdf_url && (
+                          <a
+                            href={c.nubefact_pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-md px-2 py-1 text-[12px] font-semibold text-nexa-positive hover:bg-nexa-positive/10"
+                          >
+                            PDF SUNAT
+                          </a>
+                        )}
                       </div>
                     </td>
                   </tr>
