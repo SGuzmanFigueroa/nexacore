@@ -4,7 +4,7 @@ import SubmitButton from "@/components/SubmitButton";
 import AgregarAdjuntoButton from "@/components/AgregarAdjuntoButton";
 import { createClient } from "@/lib/supabase/server";
 import { formatSoles, formatFecha } from "@/lib/format";
-import { proximoCobro, diasHasta } from "@/lib/cobranza";
+import { proximoCobro, diasHasta, diaCobroAFecha } from "@/lib/cobranza";
 import {
   CLIENTE_ESTADOS,
   CLIENTE_ESTADO_LABELS,
@@ -214,13 +214,10 @@ export default async function ClienteFichaPage({
                 <label className={labelClass}>Día de cobro</label>
                 <input
                   name="dia_cobro"
-                  type="number"
-                  min={1}
-                  max={31}
-                  defaultValue={c.dia_cobro ?? ""}
-                  placeholder="No aplica"
+                  type="date"
+                  defaultValue={diaCobroAFecha(c.dia_cobro)}
                   className={`${inputClass} mt-1`}
-                  title="Día del mes en que corresponde cobrarle. Vacío = no aplica."
+                  title="Elige cualquier fecha; solo se guarda el día del mes. Vacío = no aplica."
                 />
               </div>
               <div className="col-span-2">

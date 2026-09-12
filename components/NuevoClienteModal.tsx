@@ -54,15 +54,17 @@ export default function NuevoClienteModal() {
                   <option value="pausado">Pausado</option>
                   <option value="cerrado">Cerrado</option>
                 </select>
-                <input
-                  name="dia_cobro"
-                  type="number"
-                  min={1}
-                  max={31}
-                  placeholder="Día de cobro (opcional)"
-                  className={inputClass}
-                  title="Día del mes en que corresponde cobrarle. Déjalo vacío si no aplica (proyecto puntual)."
-                />
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-500">
+                    Día de cobro (opcional — solo se usa el día, se repite cada mes)
+                  </label>
+                  <input
+                    name="dia_cobro"
+                    type="date"
+                    className={`${inputClass} mt-1`}
+                    title="Elige cualquier fecha; solo se guarda el día del mes. Déjalo vacío si no aplica (proyecto puntual)."
+                  />
+                </div>
                 <textarea name="notas" placeholder="Notas" rows={2} className={`${inputClass} col-span-2`} />
               </div>
               <div className="flex justify-end gap-2 pt-2">

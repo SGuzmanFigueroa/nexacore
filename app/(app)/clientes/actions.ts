@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { fechaADiaCobro } from "@/lib/cobranza";
 import type { ClienteEstado, TipoDocumento } from "@/lib/types";
 
 function str(formData: FormData, key: string): string | null {
@@ -10,13 +11,6 @@ function str(formData: FormData, key: string): string | null {
   if (v === null) return null;
   const s = String(v).trim();
   return s === "" ? null : s;
-}
-
-function diaCobro(formData: FormData): number | null {
-  const s = str(formData, "dia_cobro");
-  if (!s) return null;
-  const n = Number(s);
-  return Number.isInteger(n) && n >= 1 && n <= 31 ? n : null;
 }
 
 export async function createCliente(formData: FormData) {
@@ -40,7 +34,7 @@ export async function createCliente(formData: FormData) {
       contacto_correo: str(formData, "contacto_correo"),
       estado: (str(formData, "estado") ?? "piloto") as ClienteEstado,
       notas: str(formData, "notas"),
-      dia_cobro: diaCobro(formData),
+      dia_cobro: fechaADiaCobro(str(formData, "dia_cobro")),
       created_by: user?.id ?? null,
     })
     .select("id")
@@ -72,7 +66,7 @@ export async function updateCliente(clienteId: string, formData: FormData) {
       contacto_correo: str(formData, "contacto_correo"),
       estado: str(formData, "estado") as ClienteEstado,
       notas: str(formData, "notas"),
-      dia_cobro: diaCobro(formData),
+      dia_cobro: fechaADiaCobro(str(formData, "dia_cobro")),
     })
     .eq("id", clienteId);
 
