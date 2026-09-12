@@ -29,13 +29,16 @@ emitió en el SEE de SUNAT o un facturador/OSE. Acceso solo para admin.
 
 Tablas nuevas, todas prefijadas `core_` y con RLS (`is_admin()`):
 
-- `core_clientes`, `core_servicios`, `core_comprobantes` (ingresos),
-  `core_gastos`, `core_notas_cliente` (seguimiento por cliente),
-  `core_configuracion` (fila única: RUC, razón social, régimen de Renta),
+- `core_clientes` (incluye `dia_cobro`, opcional, para cobro recurrente),
+  `core_servicios`, `core_comprobantes` (ingresos), `core_gastos`,
+  `core_notas_cliente` (seguimiento por cliente), `core_configuracion`
+  (fila única: RUC, razón social, régimen de Renta),
   `core_series_comprobante` (correlativo para una futura emisión real),
-  `core_recordatorios_sunat_enviados` (evita duplicar el correo de aviso).
+  `core_comprobante_adjuntos` (adjuntos extra por comprobante),
+  `core_recordatorios_sunat_enviados` y `core_recordatorios_cobranza_enviados`
+  (evitan duplicar los correos de aviso).
 
-Ver `supabase/migrations/` para el detalle completo (0001 a 0005).
+Ver `supabase/migrations/` para el detalle completo (0001 a 0006).
 
 ## Puesta en marcha
 
@@ -71,11 +74,21 @@ en bug-tracker/equipo-nexa (el login es compartido).
   (régimen de Renta editable), y en `/panel`: cronograma de vencimientos
   SUNAT (según el dígito del RUC, tabla 2026) + estimado de IGV/Renta del
   mes. Todo informativo — nunca se envía nada a SUNAT.
-- **Extra:** correo automático de recordatorio (5, 2 y 0 días antes del
-  vencimiento) vía la función programada de Netlify, y una integración con
-  Nubefact ya escrita (`lib/nubefact.ts`, tabla `core_series_comprobante`)
-  para cuando se active un plan de producción — hoy el registro de
-  ingresos sigue siendo manual (Fase 2), a propósito.
+- **Extra:** correo automático de recordatorio SUNAT (5, 2 y 0 días antes
+  del vencimiento) vía función programada de Netlify, y una integración
+  con Nubefact ya escrita (`lib/nubefact.ts`, tabla
+  `core_series_comprobante`) para cuando se active un plan de producción —
+  hoy el registro de ingresos sigue siendo manual (Fase 2), a propósito.
+- **Cobranza recurrente:** cada cliente puede tener un `dia_cobro` (día
+  del mes en que corresponde facturarle; vacío = no aplica, proyectos
+  puntuales). Con eso, `/clientes/[id]` y `/panel` muestran el próximo
+  cobro, y otra función programada de Netlify
+  (`recordatorio-cobranza.mts`) avisa por correo el día que toca cobrar.
+  `/panel` también suma "Cobrado del mes" aparte de "Ingresos del mes"
+  (facturado vs. efectivamente cobrado pueden caer en meses distintos).
+- **Adjuntos múltiples:** cada comprobante admite adjuntos extra (además
+  del principal) — voucher de pago, contrato, etc. — vía el botón
+  "+ Adjuntar" en `/ingresos` y en la ficha del cliente.
 
 Todas las fases están completas. Puntos abiertos:
 - El cronograma de vencimientos SUNAT (`lib/sunat.ts`) tiene las fechas

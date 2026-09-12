@@ -87,3 +87,19 @@ export async function anularComprobante(id: string) {
   revalidatePath("/ingresos");
   revalidatePath("/clientes");
 }
+
+// Adjunto adicional sobre un comprobante ya registrado (comprobante de
+// pago, contrato, etc.), aparte del adjunto principal (la factura/boleta
+// misma) que se sube al crearlo. El archivo ya se subio a Storage desde el
+// cliente (bucket privado core-adjuntos); aqui solo se guarda la referencia.
+export async function agregarAdjuntoComprobante(comprobanteId: string, storagePath: string, nombre: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("core_comprobante_adjuntos")
+    .insert({ comprobante_id: comprobanteId, storage_path: storagePath, nombre });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/ingresos");
+  revalidatePath("/clientes");
+}

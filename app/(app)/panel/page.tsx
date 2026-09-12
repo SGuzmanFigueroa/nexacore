@@ -7,11 +7,13 @@ import { formatSoles, formatFecha } from "@/lib/format";
 import {
   estadoComprobanteDisplay,
   REGIMEN_RENTA_LABELS,
+  type Cliente,
   type Comprobante,
   type Configuracion,
   type Gasto,
 } from "@/lib/types";
 import { calcularEstimadoMensual, nombrePeriodo, proximoVencimiento } from "@/lib/sunat";
+import { proximoCobro, diasHasta } from "@/lib/cobranza";
 
 const MESES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -47,6 +49,12 @@ export default async function PanelPage() {
     supabase.from("core_configuracion").select("*").eq("id", true).single(),
   ]);
 
+  const { data: clientesConCobro } = await supabase
+    .from("core_clientes")
+    .select("*")
+    .not("dia_cobro", "is", null)
+    .in("estado", ["activo", "piloto"]);
+
   type ComprobanteConCliente = Comprobante & {
     core_clientes: { nombre: string; nombre_comercial: string | null } | null;
   };
@@ -64,6 +72,15 @@ export default async function PanelPage() {
   const porCobrar = comprobantes
     .filter((c) => c.estado_pago === "pendiente")
     .reduce((s, c) => s + c.total, 0);
+  const cobradoMes = comprobantes
+    .filter((c) => c.fecha_cobro && monthKey(c.fecha_cobro) === mesActual && c.estado_pago === "cobrado")
+    .reduce((s, c) => s + c.total, 0);
+
+  const proximosCobros = ((clientesConCobro ?? []) as Cliente[])
+    .map((cl) => ({ cliente: cl, fecha: proximoCobro(cl.dia_cobro!, hoy) }))
+    .filter((x) => diasHasta(x.fecha, hoy) <= 15)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha))
+    .slice(0, 6);
 
   const barras = Array.from({ length: 5 }).map((_, i) => {
     const d = new Date(hoy.getFullYear(), hoy.getMonth() - (4 - i), 1);
@@ -129,7 +146,7 @@ export default async function PanelPage() {
       />
 
       <div className="space-y-6 p-7">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="rounded-[14px] border border-nexa-border bg-white p-5">
             <p className="text-[11px] font-bold uppercase tracking-wide text-nexa-topbar-muted">Ingresos del mes</p>
             <p className="num mt-1 text-xl font-bold text-nexa-navy">{formatSoles(ingresosMes)}</p>
@@ -143,6 +160,10 @@ export default async function PanelPage() {
             <p className={`num mt-1 text-xl font-bold ${utilidadMes >= 0 ? "text-nexa-positive" : "text-nexa-alert"}`}>
               {formatSoles(utilidadMes)}
             </p>
+          </div>
+          <div className="rounded-[14px] border border-nexa-border bg-white p-5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-nexa-topbar-muted">Cobrado del mes</p>
+            <p className="num mt-1 text-xl font-bold text-nexa-positive">{formatSoles(cobradoMes)}</p>
           </div>
           <div className="rounded-[14px] border border-nexa-border bg-nexa-navy p-5 text-white">
             <p className="text-[11px] font-bold uppercase tracking-wide text-nexa-sidebar-text-muted">Por cobrar</p>
@@ -230,6 +251,41 @@ export default async function PanelPage() {
                 </Link>
               ))}
             </div>
+          </div>
+        </div>
+
+        <div className="rounded-[14px] border border-nexa-border bg-white p-6">
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-nexa-topbar-muted">
+            Próximos cobros recurrentes
+          </p>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {proximosCobros.length === 0 && (
+              <p className="text-sm text-nexa-topbar-muted">Sin cobros recurrentes próximos.</p>
+            )}
+            {proximosCobros.map(({ cliente, fecha }) => {
+              const dias = diasHasta(fecha, hoy);
+              return (
+                <Link
+                  key={cliente.id}
+                  href={`/clientes/${cliente.id}`}
+                  className="flex items-center justify-between rounded-md border border-nexa-border px-3 py-2 hover:bg-nexa-app-bg"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-semibold text-nexa-navy">
+                      {cliente.nombre_comercial || cliente.nombre}
+                    </p>
+                    <p className="text-[11px] text-nexa-topbar-muted">{formatFecha(fecha)}</p>
+                  </div>
+                  <span
+                    className={`num shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                      dias <= 0 ? "bg-nexa-alert/10 text-nexa-alert" : "bg-nexa-light text-nexa-blue"
+                    }`}
+                  >
+                    {dias <= 0 ? "Hoy" : `${dias}d`}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
 

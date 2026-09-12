@@ -36,6 +36,9 @@ export interface Cliente {
   estado: ClienteEstado;
   fecha_alta: string;
   notas: string | null;
+  // Dia del mes (1-31) en que corresponde cobrarle. NULL = no aplica
+  // (proyecto puntual, sin cobro periodico fijo).
+  dia_cobro: number | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
@@ -111,6 +114,14 @@ export function estadoComprobanteDisplay(c: Pick<Comprobante, "estado_pago" | "f
     if (c.fecha_vencimiento < hoy) return "vencido";
   }
   return c.estado_pago;
+}
+
+export interface ComprobanteAdjunto {
+  id: string;
+  comprobante_id: string;
+  storage_path: string;
+  nombre: string | null;
+  created_at: string;
 }
 
 export interface NotaCliente {

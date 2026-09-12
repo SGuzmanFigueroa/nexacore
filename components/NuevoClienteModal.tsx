@@ -48,12 +48,21 @@ export default function NuevoClienteModal() {
                 <input name="contacto_cargo" placeholder="Contacto: cargo" className={inputClass} />
                 <input name="contacto_telefono" placeholder="Contacto: teléfono" className={inputClass} />
                 <input name="contacto_correo" type="email" placeholder="Contacto: correo" className={inputClass} />
-                <select name="estado" defaultValue="piloto" className={`${inputClass} col-span-2`}>
+                <select name="estado" defaultValue="piloto" className={inputClass}>
                   <option value="piloto">Piloto</option>
                   <option value="activo">Activo</option>
                   <option value="pausado">Pausado</option>
                   <option value="cerrado">Cerrado</option>
                 </select>
+                <input
+                  name="dia_cobro"
+                  type="number"
+                  min={1}
+                  max={31}
+                  placeholder="Día de cobro (opcional)"
+                  className={inputClass}
+                  title="Día del mes en que corresponde cobrarle. Déjalo vacío si no aplica (proyecto puntual)."
+                />
                 <textarea name="notas" placeholder="Notas" rows={2} className={`${inputClass} col-span-2`} />
               </div>
               <div className="flex justify-end gap-2 pt-2">

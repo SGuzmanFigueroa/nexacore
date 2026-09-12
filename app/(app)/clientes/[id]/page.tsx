@@ -1,13 +1,16 @@
 import { notFound } from "next/navigation";
 import Topbar from "@/components/Topbar";
 import SubmitButton from "@/components/SubmitButton";
+import AgregarAdjuntoButton from "@/components/AgregarAdjuntoButton";
 import { createClient } from "@/lib/supabase/server";
 import { formatSoles, formatFecha } from "@/lib/format";
+import { proximoCobro, diasHasta } from "@/lib/cobranza";
 import {
   CLIENTE_ESTADOS,
   CLIENTE_ESTADO_LABELS,
   estadoComprobanteDisplay,
   type Cliente,
+  type ComprobanteAdjunto,
   type NotaCliente,
 } from "@/lib/types";
 import { updateCliente, addNotaCliente } from "../actions";
@@ -58,6 +61,25 @@ export default async function ClienteFichaPage({
   }
   const porCobrar = facturado - cobrado;
 
+  const adjuntosPorComprobante = new Map<string, ComprobanteAdjunto[]>();
+  if (comprobantes && comprobantes.length > 0) {
+    const { data: adjuntos } = await supabase
+      .from("core_comprobante_adjuntos")
+      .select("*")
+      .in(
+        "comprobante_id",
+        comprobantes.map((c) => c.id),
+      );
+    for (const a of (adjuntos ?? []) as ComprobanteAdjunto[]) {
+      const arr = adjuntosPorComprobante.get(a.comprobante_id) ?? [];
+      arr.push(a);
+      adjuntosPorComprobante.set(a.comprobante_id, arr);
+    }
+  }
+
+  const proximo = c.dia_cobro ? proximoCobro(c.dia_cobro) : null;
+  const diasParaCobro = proximo ? diasHasta(proximo) : null;
+
   const update = updateCliente.bind(null, id);
   const addNota = addNotaCliente.bind(null, id);
 
@@ -73,7 +95,7 @@ export default async function ClienteFichaPage({
           {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
           {/* KPIs */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-[14px] border border-nexa-border bg-white p-5">
               <p className={labelClass}>Facturado</p>
               <p className="num mt-1 text-xl font-bold text-nexa-navy">{formatSoles(facturado)}</p>
@@ -85,6 +107,23 @@ export default async function ClienteFichaPage({
             <div className="rounded-[14px] border border-nexa-border bg-white p-5">
               <p className={labelClass}>Por cobrar</p>
               <p className="num mt-1 text-xl font-bold text-nexa-alert">{formatSoles(porCobrar)}</p>
+            </div>
+            <div className="rounded-[14px] border border-nexa-border bg-nexa-navy p-5 text-white">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-nexa-sidebar-text-muted">
+                Próximo cobro
+              </p>
+              {proximo ? (
+                <>
+                  <p className="mt-1 text-lg font-bold">{formatFecha(proximo)}</p>
+                  <p className="text-[11.5px] text-nexa-sidebar-text-muted">
+                    {diasParaCobro !== null && diasParaCobro <= 0
+                      ? "Hoy o vencido"
+                      : `En ${diasParaCobro} día${diasParaCobro === 1 ? "" : "s"}`}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-sm font-semibold text-nexa-sidebar-text-muted">No aplica</p>
+              )}
             </div>
           </div>
 
@@ -171,6 +210,19 @@ export default async function ClienteFichaPage({
                   ))}
                 </select>
               </div>
+              <div>
+                <label className={labelClass}>Día de cobro</label>
+                <input
+                  name="dia_cobro"
+                  type="number"
+                  min={1}
+                  max={31}
+                  defaultValue={c.dia_cobro ?? ""}
+                  placeholder="No aplica"
+                  className={`${inputClass} mt-1`}
+                  title="Día del mes en que corresponde cobrarle. Vacío = no aplica."
+                />
+              </div>
               <div className="col-span-2">
                 <label className={labelClass}>Notas generales</label>
                 <textarea name="notas" defaultValue={c.notas ?? ""} rows={3} className={`${inputClass} mt-1`} />
@@ -224,11 +276,24 @@ export default async function ClienteFichaPage({
                             href={comp.nubefact_pdf_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[12px] font-semibold text-nexa-positive hover:underline"
+                            className="mr-2 text-[12px] font-semibold text-nexa-positive hover:underline"
                           >
                             PDF SUNAT
                           </a>
                         )}
+                        {(adjuntosPorComprobante.get(comp.id) ?? []).map((a) => (
+                          <a
+                            key={a.id}
+                            href={`/api/adjuntos/${encodeURIComponent(a.storage_path)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={a.nombre ?? undefined}
+                            className="mr-2 text-[12px] font-semibold text-nexa-blue hover:underline"
+                          >
+                            {a.nombre && a.nombre.length > 14 ? "Adjunto" : a.nombre || "Adjunto"}
+                          </a>
+                        ))}
+                        <AgregarAdjuntoButton comprobanteId={comp.id} />
                       </td>
                     </tr>
                   ))}

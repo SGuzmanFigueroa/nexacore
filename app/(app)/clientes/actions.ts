@@ -12,6 +12,13 @@ function str(formData: FormData, key: string): string | null {
   return s === "" ? null : s;
 }
 
+function diaCobro(formData: FormData): number | null {
+  const s = str(formData, "dia_cobro");
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isInteger(n) && n >= 1 && n <= 31 ? n : null;
+}
+
 export async function createCliente(formData: FormData) {
   const supabase = await createClient();
   const {
@@ -33,6 +40,7 @@ export async function createCliente(formData: FormData) {
       contacto_correo: str(formData, "contacto_correo"),
       estado: (str(formData, "estado") ?? "piloto") as ClienteEstado,
       notas: str(formData, "notas"),
+      dia_cobro: diaCobro(formData),
       created_by: user?.id ?? null,
     })
     .select("id")
@@ -64,6 +72,7 @@ export async function updateCliente(clienteId: string, formData: FormData) {
       contacto_correo: str(formData, "contacto_correo"),
       estado: str(formData, "estado") as ClienteEstado,
       notas: str(formData, "notas"),
+      dia_cobro: diaCobro(formData),
     })
     .eq("id", clienteId);
 

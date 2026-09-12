@@ -2,6 +2,7 @@ import Topbar from "@/components/Topbar";
 import RegistrarMovimientoModal from "@/components/RegistrarMovimientoModal";
 import MarcarCobradoForm from "@/components/MarcarCobradoForm";
 import ConfirmSubmitButton from "@/components/ConfirmSubmitButton";
+import AgregarAdjuntoButton from "@/components/AgregarAdjuntoButton";
 import { createClient } from "@/lib/supabase/server";
 import { formatSoles, formatFecha } from "@/lib/format";
 import {
@@ -9,6 +10,7 @@ import {
   MEDIO_PAGO_LABELS,
   estadoComprobanteDisplay,
   type Comprobante,
+  type ComprobanteAdjunto,
   type EstadoComprobanteDisplay,
   type MedioPago,
 } from "@/lib/types";
@@ -55,6 +57,22 @@ export default async function IngresosPage({
   }
   if (estado) {
     lista = lista.filter((c) => estadoComprobanteDisplay(c) === estado);
+  }
+
+  const adjuntosPorComprobante = new Map<string, ComprobanteAdjunto[]>();
+  if (lista.length > 0) {
+    const { data: adjuntos } = await supabase
+      .from("core_comprobante_adjuntos")
+      .select("*")
+      .in(
+        "comprobante_id",
+        lista.map((c) => c.id),
+      );
+    for (const a of (adjuntos ?? []) as ComprobanteAdjunto[]) {
+      const arr = adjuntosPorComprobante.get(a.comprobante_id) ?? [];
+      arr.push(a);
+      adjuntosPorComprobante.set(a.comprobante_id, arr);
+    }
   }
 
   const emitido = lista.filter((c) => c.estado_pago !== "anulado").reduce((s, c) => s + c.total, 0);
@@ -187,6 +205,19 @@ export default async function IngresosPage({
                             PDF SUNAT
                           </a>
                         )}
+                        {(adjuntosPorComprobante.get(c.id) ?? []).map((a) => (
+                          <a
+                            key={a.id}
+                            href={`/api/adjuntos/${encodeURIComponent(a.storage_path)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={a.nombre ?? undefined}
+                            className="rounded-md px-2 py-1 text-[12px] font-semibold text-nexa-blue hover:bg-nexa-light"
+                          >
+                            {a.nombre && a.nombre.length > 14 ? "Adjunto" : a.nombre || "Adjunto"}
+                          </a>
+                        ))}
+                        <AgregarAdjuntoButton comprobanteId={c.id} />
                       </div>
                     </td>
                   </tr>
