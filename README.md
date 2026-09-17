@@ -91,9 +91,10 @@ en bug-tracker/equipo-nexa (el login es compartido).
   "+ Adjuntar" en `/ingresos` y en la ficha del cliente.
 
 Todas las fases están completas. Puntos abiertos:
-- El cronograma de vencimientos SUNAT (`lib/sunat.ts`) tiene las fechas
-  hardcodeadas para el año 2026 — SUNAT publica un cronograma nuevo cada
-  año, así que hay que actualizar esa tabla cuando empiece 2027.
+- Los cronogramas SUNAT (`lib/sunatCalendar.ts`) — Registros SIRE y
+  Formulario Virtual 621, cada uno con su propia fecha — tienen las fechas
+  hardcodeadas para el año 2026. SUNAT publica un cronograma nuevo cada
+  año, así que hay que agregar el año 2027 ahí cuando lo publique.
 - El correo de recordatorio necesita `SUPABASE_SERVICE_ROLE_KEY` y
   `RESEND_API_KEY` en las variables de entorno de **Netlify** (no solo
   local) para funcionar una vez desplegado — ver `.env.local.example`.

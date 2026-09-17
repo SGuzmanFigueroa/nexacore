@@ -200,3 +200,65 @@ export interface Configuracion {
   regimen_renta: RegimenRenta;
   updated_at: string;
 }
+
+// Dos obligaciones SUNAT distintas, con fechas distintas: el atraso máximo
+// del Registro de Ventas/Compras electrónico (SIRE) y la declaración y
+// pago mensual de IGV-Renta (Formulario Virtual 621).
+export type ObligacionSunatTipo = "sire" | "fv621";
+
+export const OBLIGACION_SUNAT_TIPO_LABELS: Record<ObligacionSunatTipo, string> = {
+  sire: "Registros SIRE",
+  fv621: "Declaración FV 621",
+};
+
+export type ObligacionSireEstado = "pendiente" | "presentado";
+export type ObligacionFv621Estado = "pendiente" | "declarado" | "pagado";
+export type ObligacionSunatEstado = ObligacionSireEstado | ObligacionFv621Estado;
+
+export const OBLIGACION_ESTADO_LABELS: Record<ObligacionSunatEstado, string> = {
+  pendiente: "Pendiente",
+  presentado: "Presentado",
+  declarado: "Declarado",
+  pagado: "Pagado",
+};
+
+export const OBLIGACION_ESTADOS_POR_TIPO: Record<ObligacionSunatTipo, ObligacionSunatEstado[]> = {
+  sire: ["pendiente", "presentado"],
+  fv621: ["pendiente", "declarado", "pagado"],
+};
+
+// Registro manual del estado de una obligación SUNAT por período. Nexa
+// Core NUNCA marca esto automáticamente por la existencia de un
+// movimiento — lo confirma el admin a mano después de presentar/pagar en
+// SUNAT Operaciones en Línea.
+//
+// "Declarado" y "pagado" son hechos distintos con su propia fecha/monto —
+// un FV621 puede estar declarado sin estar pagado todavía. Semántica
+// (solo aplica a FV621; SIRE no declara montos):
+//   monto_igv / monto_renta = IGV / Renta DECLARADOS en el FV621
+//   total_declarado         = total determinado/declarado en el FV621
+//   total_pagado             = dinero EFECTIVAMENTE pagado a SUNAT
+//   fecha_presentacion      = fecha de declaración/presentación
+//   fecha_pago               = fecha en que se realizó el pago
+export interface ObligacionSunat {
+  id: string;
+  periodo: string;
+  tipo: ObligacionSunatTipo;
+  estado: ObligacionSunatEstado;
+  fecha_presentacion: string | null;
+  fecha_pago: string | null;
+  monto_igv: number | null;
+  monto_renta: number | null;
+  total_declarado: number | null;
+  total_pagado: number | null;
+  numero_orden: string | null;
+  observaciones: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// true si el estado representa la obligación ya cumplida (no "pendiente").
+export function obligacionCumplida(estado: ObligacionSunatEstado): boolean {
+  return estado !== "pendiente";
+}

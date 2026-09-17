@@ -75,6 +75,18 @@ export function ReportesIcon() {
   );
 }
 
+export function SunatIcon() {
+  return (
+    <svg {...common}>
+      <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+      <path d="M14 4v6h6" />
+      <circle cx="9" cy="15.5" r="2.2" />
+      <path d="M15 12.5l-6 6" />
+      <circle cx="15" cy="18.5" r="0.2" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function ConfiguracionIcon() {
   return (
     <svg {...common}>

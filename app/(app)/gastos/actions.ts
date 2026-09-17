@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { calculateSalesVAT } from "@/lib/taxService";
 import type { GastoCategoria, GastoFrecuencia, MedioPago } from "@/lib/types";
 
 function str(formData: FormData, key: string): string | null {
@@ -26,7 +27,7 @@ export async function createGasto(formData: FormData) {
   const monto = num(formData, "monto");
   const creditoFiscal = formData.get("credito_fiscal") === "on";
   // El IGV se extrae de un monto que ya incluye IGV (monto = total pagado).
-  const igv = creditoFiscal ? Math.round(((monto * 0.18) / 1.18) * 100) / 100 : 0;
+  const igv = creditoFiscal ? calculateSalesVAT(monto) : 0;
 
   const { error } = await supabase.from("core_gastos").insert({
     fecha: str(formData, "fecha") ?? new Date().toISOString().slice(0, 10),

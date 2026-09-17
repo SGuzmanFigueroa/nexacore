@@ -11,6 +11,7 @@ import {
   GastosIcon,
   CobranzasIcon,
   ReportesIcon,
+  SunatIcon,
   ConfiguracionIcon,
 } from "./icons";
 
@@ -116,6 +117,9 @@ export default function Sidebar({
           </p>
           <NavLink href="/reportes" icon={<ReportesIcon />} onNavigate={close}>
             Reportes
+          </NavLink>
+          <NavLink href="/sunat" icon={<SunatIcon />} onNavigate={close}>
+            SUNAT
           </NavLink>
           <NavLink href="/configuracion" icon={<ConfiguracionIcon />} onNavigate={close}>
             Configuración

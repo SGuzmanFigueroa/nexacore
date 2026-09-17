@@ -14,11 +14,13 @@ export default function SubmitButton({
   variant = "primary",
   pendingLabel = "Guardando...",
   className = "",
+  disabled = false,
   children,
 }: {
   variant?: keyof typeof VARIANT_STYLES;
   pendingLabel?: string;
   className?: string;
+  disabled?: boolean;
   children: React.ReactNode;
 }) {
   const { pending } = useFormStatus();
@@ -26,7 +28,7 @@ export default function SubmitButton({
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       className={`inline-flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-70 ${VARIANT_STYLES[variant]} ${className}`}
     >
       {pending && (

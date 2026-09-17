@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { calculateVATPayable } from "@/lib/taxService";
 import { estadoComprobanteDisplay, type Cliente, type Comprobante, type Gasto } from "@/lib/types";
 
 export async function GET() {
@@ -106,7 +107,7 @@ export async function GET() {
       Ingresos: v.ingresos,
       Gastos: v.gastos,
       Utilidad: v.ingresos - v.gastos,
-      "IGV a pagar (estimado)": v.igvVentas - v.igvCompras,
+      "IGV a pagar (estimado)": calculateVATPayable(v.igvVentas, v.igvCompras).igvPorPagar,
     }));
 
   const workbook = XLSX.utils.book_new();

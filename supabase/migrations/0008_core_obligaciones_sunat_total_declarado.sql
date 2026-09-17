@@ -1,0 +1,17 @@
+-- Separa "declarado" de "pagado" en core_obligaciones_sunat: hasta ahora
+-- total_pagado se estaba reutilizando en la UI como si fuera el total
+-- determinado en el FV621, pero un período puede estar DECLARADO sin
+-- estar PAGADO todavia (son dos hechos distintos, con su propia fecha).
+--
+-- Aditiva: agrega total_declarado nullable, no toca total_pagado ni
+-- ninguna otra columna, no borra ni reescribe filas existentes.
+--
+-- Semantica final de core_obligaciones_sunat (solo FV621 usa monto_igv/
+-- monto_renta/total_declarado/total_pagado; SIRE no declara montos):
+--   monto_igv         = IGV declarado
+--   monto_renta        = Renta declarada
+--   total_declarado    = total determinado/declarado en el FV621
+--   total_pagado        = dinero efectivamente pagado a SUNAT
+--   fecha_presentacion = fecha de declaracion/presentacion
+--   fecha_pago         = fecha en que efectivamente se realizo el pago
+alter table core_obligaciones_sunat add column total_declarado numeric(12,2);

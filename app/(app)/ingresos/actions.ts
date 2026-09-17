@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { calculateVATFromBase } from "@/lib/taxService";
 import type { ComprobanteTipo, MedioPago } from "@/lib/types";
 
 function str(formData: FormData, key: string): string | null {
@@ -30,7 +31,7 @@ export async function createComprobante(formData: FormData) {
 
   const subtotal = num(formData, "subtotal");
   const afectoIgv = formData.get("afecto_igv") === "on";
-  const igv = afectoIgv ? Math.round(subtotal * 0.18 * 100) / 100 : 0;
+  const igv = afectoIgv ? calculateVATFromBase(subtotal) : 0;
   const total = Math.round((subtotal + igv) * 100) / 100;
 
   const { error } = await supabase.from("core_comprobantes").insert({

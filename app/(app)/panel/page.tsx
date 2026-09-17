@@ -2,6 +2,8 @@ import Link from "next/link";
 import Topbar from "@/components/Topbar";
 import RegistrarMovimientoModal from "@/components/RegistrarMovimientoModal";
 import BarrasIngresosGastos from "@/components/BarrasIngresosGastos";
+import ObligacionSunatModal from "@/components/ObligacionSunatModal";
+import EstadoObligacionBadge from "@/components/EstadoObligacionBadge";
 import { createClient } from "@/lib/supabase/server";
 import { formatSoles, formatFecha } from "@/lib/format";
 import {
@@ -11,9 +13,12 @@ import {
   type Comprobante,
   type Configuracion,
   type Gasto,
+  type ObligacionSunat,
 } from "@/lib/types";
-import { calcularEstimadoMensual, nombrePeriodo, proximoVencimiento } from "@/lib/sunat";
+import { getSunatDeadline, nombrePeriodo } from "@/lib/sunatCalendar";
+import { buildEstimadoPeriodo, calculateCollectionsAfterTaxReserve, getRentaRate } from "@/lib/taxService";
 import { proximoCobro, diasHasta } from "@/lib/cobranza";
+import { actualizarObligacionSunat } from "./actions";
 
 const MESES = [
   "Ene", "Feb", "Mar", "Abr", "May", "Jun",
@@ -24,7 +29,12 @@ function monthKey(iso: string) {
   return iso.slice(0, 7); // YYYY-MM
 }
 
-export default async function PanelPage() {
+export default async function PanelPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; message?: string }>;
+}) {
+  const { error, message } = await searchParams;
   const supabase = await createClient();
 
   const hoy = new Date();
@@ -32,12 +42,20 @@ export default async function PanelPage() {
     .toISOString()
     .slice(0, 10);
   const mesActual = hoy.toISOString().slice(0, 7);
+  // Período que corresponde declarar AHORA: el mes anterior al actual. Un
+  // período tributario siempre se declara/paga el mes siguiente a que
+  // cierra, así que lo que "toca declarar" en un momento dado es siempre
+  // el mes ya cerrado, no el que todavía se está acumulando.
+  const periodoObligacion = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1)
+    .toISOString()
+    .slice(0, 7);
 
   const [
     { data: comprobantesRaw },
     { data: gastosRaw },
     { data: clientes },
     { data: configRaw },
+    { data: obligacionesRaw },
   ] = await Promise.all([
     supabase
       .from("core_comprobantes")
@@ -47,6 +65,7 @@ export default async function PanelPage() {
     supabase.from("core_gastos").select("*").gte("fecha", inicioVentana).order("fecha", { ascending: false }),
     supabase.from("core_clientes").select("id, nombre, nombre_comercial").order("nombre"),
     supabase.from("core_configuracion").select("*").eq("id", true).single(),
+    supabase.from("core_obligaciones_sunat").select("*").eq("periodo", periodoObligacion),
   ]);
 
   const { data: clientesConCobro } = await supabase
@@ -94,22 +113,47 @@ export default async function PanelPage() {
     };
   });
 
-  // Estimado SUNAT del mes en curso: IGV de ventas del mes menos IGV de
-  // compras con credito fiscal del mes, y pago a cuenta de Renta segun el
-  // regimen configurado. Es informativo, nunca se envia a SUNAT.
-  const igvVentasMes = comprobantes
-    .filter((c) => monthKey(c.fecha_emision) === mesActual && c.estado_pago !== "anulado")
-    .reduce((s, c) => s + c.igv, 0);
-  const igvComprasMes = gastos
-    .filter((g) => monthKey(g.fecha) === mesActual && g.credito_fiscal)
-    .reduce((s, g) => s + g.igv, 0);
-  const estimado = calcularEstimadoMensual({
-    ingresosNetos: ingresosMes,
-    igvVentas: igvVentasMes,
-    igvComprasCreditoFiscal: igvComprasMes,
-    regimen: config.regimen_renta,
-  });
-  const vencimiento = proximoVencimiento(hoy, config.ruc);
+  // Estimado SUNAT del período que corresponde declarar ahora (el mes
+  // cerrado anterior, no el que todavía se está acumulando — ver arriba).
+  // Misma agregación que usa /sunat (lib/taxService.buildEstimadoPeriodo):
+  // IGV de ventas del período menos crédito fiscal de compras del mismo
+  // período, y pago a cuenta de Renta sobre la BASE imponible (sin IGV) —
+  // nunca sobre el total cobrado con IGV incluido. Es informativo, nunca
+  // se envía a SUNAT.
+  const comprobantesPeriodo = comprobantes.filter(
+    (c) => monthKey(c.fecha_emision) === periodoObligacion && c.estado_pago !== "anulado",
+  );
+  const gastosPeriodo = gastos.filter((g) => monthKey(g.fecha) === periodoObligacion);
+  const estimadoPeriodo = buildEstimadoPeriodo(comprobantesPeriodo, gastosPeriodo, config.regimen_renta);
+  const tasaRenta = getRentaRate(config.regimen_renta);
+
+  // Estimación tributaria del MES EN CURSO (distinta de "Obligaciones
+  // SUNAT" arriba, que es el período ya cerrado que corresponde declarar
+  // ahora). Esto es solo para saber cuánto conviene reservar de lo que se
+  // va facturando/cobrando este mes — no es una obligación exigible
+  // todavía: ese período se declara recién el mes que viene.
+  const comprobantesMesActual = comprobantes.filter(
+    (c) => monthKey(c.fecha_emision) === mesActual && c.estado_pago !== "anulado",
+  );
+  const gastosMesActualArr = gastos.filter((g) => monthKey(g.fecha) === mesActual);
+  const estimadoMesActual = buildEstimadoPeriodo(comprobantesMesActual, gastosMesActualArr, config.regimen_renta);
+  // Control de efectivo: SOLO mide lo cobrado este mes contra la reserva
+  // tributaria estimada — no es el saldo de caja/bancos de la empresa (que
+  // puede tener acumulado de meses anteriores). Nunca se muestra como
+  // "disponible" negativo: si no alcanza, se informa como reserva
+  // pendiente de cubrir.
+  const { disponible: disponibleCobrosMes, reservaPendiente } = calculateCollectionsAfterTaxReserve(
+    cobradoMes,
+    estimadoMesActual.reservaTributaria,
+  );
+  const fechaSireMesActual = getSunatDeadline(mesActual, config.ruc, "sire");
+  const fechaFv621MesActual = getSunatDeadline(mesActual, config.ruc, "fv621");
+
+  const obligaciones = (obligacionesRaw ?? []) as ObligacionSunat[];
+  const obligacionSire = obligaciones.find((o) => o.tipo === "sire") ?? null;
+  const obligacionFv621 = obligaciones.find((o) => o.tipo === "fv621") ?? null;
+  const fechaSire = getSunatDeadline(periodoObligacion, config.ruc, "sire");
+  const fechaFv621 = getSunatDeadline(periodoObligacion, config.ruc, "fv621");
 
   const cobranzasPendientes = comprobantes
     .filter((c) => c.estado_pago === "pendiente")
@@ -172,46 +216,185 @@ export default async function PanelPage() {
         </div>
 
         <div className="rounded-[14px] border border-nexa-border bg-white p-6">
-          <div className="mb-4 flex items-center justify-between">
+          {(error || message) && (
+            <div
+              className={`mb-4 rounded-md px-3 py-2 text-sm ${
+                error ? "bg-red-50 text-red-700" : "bg-nexa-light text-nexa-blue"
+              }`}
+            >
+              {error || message}
+            </div>
+          )}
+          <div className="mb-4 flex items-center justify-between gap-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-nexa-topbar-muted">
-              SUNAT — estimado del mes ({REGIMEN_RENTA_LABELS[config.regimen_renta]})
+              Obligaciones SUNAT pendientes — {nombrePeriodo(periodoObligacion)} ·{" "}
+              {REGIMEN_RENTA_LABELS[config.regimen_renta]}
             </p>
-            {vencimiento ? (
-              <span
-                className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                  vencimiento.vencido ? "bg-nexa-alert/10 text-nexa-alert" : "bg-nexa-light text-nexa-blue"
-                }`}
-              >
-                {nombrePeriodo(vencimiento.periodo)} vence {formatFecha(vencimiento.fecha)}
-              </span>
-            ) : (
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-500">
-                Cronograma no cargado para este período
-              </span>
-            )}
+            <Link href="/sunat" className="shrink-0 text-[11px] font-semibold text-nexa-blue hover:underline">
+              Ver historial SUNAT →
+            </Link>
           </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
             <div>
-              <p className="text-[11px] font-semibold text-nexa-topbar-muted">IGV a pagar (estimado)</p>
-              <p className={`num mt-1 text-lg font-bold ${estimado.igvAPagar >= 0 ? "text-nexa-navy" : "text-nexa-positive"}`}>
-                {estimado.igvAPagar >= 0 ? formatSoles(estimado.igvAPagar) : `${formatSoles(Math.abs(estimado.igvAPagar))} a favor`}
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">IGV ventas</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimadoPeriodo.igvVentas)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">Crédito fiscal</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimadoPeriodo.creditoFiscal)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">IGV estimado por pagar</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">
+                {formatSoles(estimadoPeriodo.igvPorPagar)}
+                {estimadoPeriodo.saldoFavor > 0 && (
+                  <span className="ml-1 text-[11px] font-semibold text-nexa-positive">
+                    ({formatSoles(estimadoPeriodo.saldoFavor)} a favor)
+                  </span>
+                )}
               </p>
             </div>
             <div>
               <p className="text-[11px] font-semibold text-nexa-topbar-muted">
-                Pago a cuenta Renta ({(estimado.tasaRenta * 100).toFixed(1)}%)
+                Pago a cuenta Renta ({(tasaRenta * 100).toFixed(1)}%)
               </p>
-              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimado.pagoACuentaRenta)}</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimadoPeriodo.pagoACuentaRenta)}</p>
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-nexa-topbar-muted">Total estimado a pagar</p>
-              <p className="num mt-1 text-lg font-bold text-nexa-alert">{formatSoles(estimado.totalEstimado)}</p>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">Total estimado</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-alert">{formatSoles(estimadoPeriodo.reservaTributaria)}</p>
             </div>
           </div>
-          <p className="mt-4 text-[11.5px] text-nexa-topbar-muted">
-            Estimado informativo a partir de lo registrado en Nexa Core — no reemplaza tu declaración en SUNAT ni el
-            cálculo de tu contador.
+
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-md border border-nexa-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[12.5px] font-semibold text-nexa-navy">Registros SIRE</p>
+                  <p className="text-[11px] text-nexa-topbar-muted">
+                    {fechaSire ? `Vence ${formatFecha(fechaSire)}` : "Cronograma no cargado para este período"}
+                  </p>
+                </div>
+                <EstadoObligacionBadge clasificacion="pasado" fechaLimite={fechaSire} hoy={hoy} registro={obligacionSire} />
+              </div>
+              <div className="mt-2">
+                <ObligacionSunatModal
+                  tipo="sire"
+                  periodo={periodoObligacion}
+                  periodoLabel={nombrePeriodo(periodoObligacion)}
+                  fechaLimite={fechaSire}
+                  registro={obligacionSire}
+                  action={actualizarObligacionSunat}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-md border border-nexa-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-[12.5px] font-semibold text-nexa-navy">Declaración FV 621</p>
+                  <p className="text-[11px] text-nexa-topbar-muted">
+                    {fechaFv621 ? `Vence ${formatFecha(fechaFv621)}` : "Cronograma no cargado para este período"}
+                  </p>
+                </div>
+                <EstadoObligacionBadge clasificacion="pasado" fechaLimite={fechaFv621} hoy={hoy} registro={obligacionFv621} />
+              </div>
+              <div className="mt-2">
+                <ObligacionSunatModal
+                  tipo="fv621"
+                  periodo={periodoObligacion}
+                  periodoLabel={nombrePeriodo(periodoObligacion)}
+                  fechaLimite={fechaFv621}
+                  registro={obligacionFv621}
+                  action={actualizarObligacionSunat}
+                />
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-4 text-[11px] text-nexa-topbar-muted">
+            Estimación informativa basada en los movimientos registrados en Nexa Core. El importe definitivo debe
+            verificarse en SUNAT y no reemplaza la declaración tributaria ni el criterio de un contador.
           </p>
+        </div>
+
+        <div className="rounded-[14px] border border-nexa-border bg-white p-6">
+          <p className="mb-4 text-[11px] font-bold uppercase tracking-wide text-nexa-topbar-muted">
+            {nombrePeriodo(mesActual)} (mes en curso)
+          </p>
+
+          {/* 1. ESTIMACIÓN TRIBUTARIA */}
+          <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-nexa-blue">Estimación tributaria</p>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">Base imponible</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimadoMesActual.baseImponible)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">IGV ventas</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimadoMesActual.igvVentas)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">Crédito fiscal</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimadoMesActual.creditoFiscal)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">IGV por pagar</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">
+                {formatSoles(estimadoMesActual.igvPorPagar)}
+                {estimadoMesActual.saldoFavor > 0 && (
+                  <span className="ml-1 text-[11px] font-semibold text-nexa-positive">
+                    ({formatSoles(estimadoMesActual.saldoFavor)} a favor)
+                  </span>
+                )}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">
+                Renta ({(tasaRenta * 100).toFixed(1)}%)
+              </p>
+              <p className="num mt-1 text-lg font-bold text-nexa-navy">{formatSoles(estimadoMesActual.pagoACuentaRenta)}</p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-nexa-topbar-muted">Reserva tributaria</p>
+              <p className="num mt-1 text-lg font-bold text-nexa-alert">{formatSoles(estimadoMesActual.reservaTributaria)}</p>
+            </div>
+          </div>
+          <p className="mt-3 text-[11px] text-nexa-topbar-muted">
+            Este período se declarará el próximo mes
+            {fechaSireMesActual && <> — SIRE estimado {formatFecha(fechaSireMesActual)}</>}
+            {fechaFv621MesActual && <>, FV621 estimado {formatFecha(fechaFv621MesActual)}</>}.
+          </p>
+
+          {/* 2. CONTROL DE EFECTIVO */}
+          <div className="mt-5 border-t border-nexa-border pt-4">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-wide text-nexa-blue">Control de efectivo</p>
+            <div className="rounded-md bg-nexa-app-bg p-3">
+              <div className="flex items-center justify-between gap-2 text-[13px]">
+                <p className="text-nexa-topbar-text">Cobrado este mes</p>
+                <p className="num font-semibold text-nexa-navy">{formatSoles(cobradoMes)}</p>
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[13px]">
+                <p className="text-nexa-topbar-text">Reserva tributaria estimada</p>
+                <p className="num font-semibold text-nexa-alert">-{formatSoles(estimadoMesActual.reservaTributaria)}</p>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 border-t border-nexa-border pt-2">
+                <p className="text-[13px] font-bold text-nexa-navy">Disponible de los cobros del mes</p>
+                <p className="num text-lg font-bold text-nexa-positive">{formatSoles(disponibleCobrosMes)}</p>
+              </div>
+              {reservaPendiente > 0 && (
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-[13px]">
+                  <p className="text-nexa-alert">Reserva pendiente de cubrir</p>
+                  <p className="num font-semibold text-nexa-alert">{formatSoles(reservaPendiente)}</p>
+                </div>
+              )}
+            </div>
+            <p className="mt-2 text-[11px] text-nexa-topbar-muted">
+              Este indicador considera únicamente los cobros registrados durante el mes. No representa el saldo total
+              disponible en cuentas bancarias o caja de la empresa.
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

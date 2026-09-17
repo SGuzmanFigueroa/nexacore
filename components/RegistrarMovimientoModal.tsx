@@ -5,6 +5,7 @@ import SubmitButton from "./SubmitButton";
 import AdjuntoInput from "./AdjuntoInput";
 import { createComprobante } from "@/app/(app)/ingresos/actions";
 import { createGasto } from "@/app/(app)/gastos/actions";
+import { calculateSalesVAT, calculateVATFromBase } from "@/lib/taxService";
 import {
   COMPROBANTE_TIPO_LABELS,
   GASTO_CATEGORIAS,
@@ -35,14 +36,11 @@ export default function RegistrarMovimientoModal({
   const [montoGasto, setMontoGasto] = useState(0);
   const [creditoFiscal, setCreditoFiscal] = useState(false);
 
-  const igv = useMemo(() => (afectoIgv ? Math.round(subtotal * 0.18 * 100) / 100 : 0), [
-    subtotal,
-    afectoIgv,
-  ]);
+  const igv = useMemo(() => (afectoIgv ? calculateVATFromBase(subtotal) : 0), [subtotal, afectoIgv]);
   const total = Math.round((subtotal + igv) * 100) / 100;
 
   const igvGasto = useMemo(
-    () => (creditoFiscal ? Math.round(((montoGasto * 0.18) / 1.18) * 100) / 100 : 0),
+    () => (creditoFiscal ? calculateSalesVAT(montoGasto) : 0),
     [montoGasto, creditoFiscal],
   );
 
