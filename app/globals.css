@@ -60,3 +60,17 @@ body {
 .num {
   font-variant-numeric: tabular-nums;
 }
+
+/* Entrada muy sutil del login — solo se aplica vía la variante
+   motion-safe: de Tailwind, así que prefers-reduced-motion la desactiva
+   automáticamente sin lógica adicional. */
+@keyframes login-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

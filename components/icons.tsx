@@ -95,3 +95,42 @@ export function ConfiguracionIcon() {
     </svg>
   );
 }
+
+// --- Íconos del formulario de login (mismo estilo stroke que arriba) -----
+
+export function MailIcon(props: { className?: string }) {
+  return (
+    <svg {...common} className={props.className} aria-hidden="true">
+      <rect x="2.5" y="4.5" width="19" height="15" rx="2.5" />
+      <path d="M3.5 6.5l8.5 6.5 8.5-6.5" />
+    </svg>
+  );
+}
+
+export function LockIcon(props: { className?: string }) {
+  return (
+    <svg {...common} className={props.className} aria-hidden="true">
+      <rect x="4" y="10.5" width="16" height="10" rx="2.2" />
+      <path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5" />
+    </svg>
+  );
+}
+
+export function EyeIcon(props: { className?: string }) {
+  return (
+    <svg {...common} className={props.className} aria-hidden="true">
+      <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function EyeOffIcon(props: { className?: string }) {
+  return (
+    <svg {...common} className={props.className} aria-hidden="true">
+      <path d="M3.5 3.5l17 17" />
+      <path d="M10.6 5.7A10.7 10.7 0 0 1 12 5.5c6.4 0 10 6.5 10 6.5a15.6 15.6 0 0 1-3.4 4.2M6.4 6.8C3.7 8.6 2 12 2 12s3.6 6.5 10 6.5a10 10 0 0 0 4.2-.9" />
+      <path d="M9.9 10.1a3 3 0 0 0 4.1 4.1" />
+    </svg>
+  );
+}
