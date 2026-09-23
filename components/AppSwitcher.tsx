@@ -29,6 +29,15 @@ const NEXA_APPS = [
     href: "https://nexacoreinterno.netlify.app/panel",
     icon: <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />,
   },
+  {
+    id: "bot",
+    name: "Nexa Bot",
+    description: "Bot de Discord del equipo",
+    href: "https://botnexaconsulting.netlify.app/",
+    icon: (
+      <path d="M12 8V4H8M6 8h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2ZM2 14h2M20 14h2M9 13v2M15 13v2" />
+    ),
+  },
 ] as const;
 
 const CURRENT_APP = "core";
