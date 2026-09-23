@@ -1,3 +1,5 @@
+import AppSwitcher from "./AppSwitcher";
+
 export default function Topbar({
   title,
   subtitle,
@@ -15,7 +17,12 @@ export default function Topbar({
           <p className="truncate text-[11.5px] font-medium text-nexa-topbar-muted">{subtitle}</p>
         )}
       </div>
-      {actions && <div className="ml-auto flex shrink-0 items-center gap-3">{actions}</div>}
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+        {actions}
+        <div className="hidden md:block">
+          <AppSwitcher />
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signOut } from "@/app/login/actions";
 import type { Profile } from "@/lib/types";
 import NavLink from "./NavLink";
+import AppSwitcher from "./AppSwitcher";
 import {
   PanelIcon,
   ClientesIcon,
@@ -41,21 +42,24 @@ export default function Sidebar({
           </span>
           <p className="text-sm font-semibold text-white">Nexa Core</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="Abrir menú"
-          className="rounded-md p-2 text-white hover:bg-white/10"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M3 5h14M3 10h14M3 15h14"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <AppSwitcher buttonClassName="text-white hover:bg-white/10" />
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label="Abrir menú"
+            className="rounded-md p-2 text-white hover:bg-white/10"
+          >
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <path
+                d="M3 5h14M3 10h14M3 15h14"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {open && (
